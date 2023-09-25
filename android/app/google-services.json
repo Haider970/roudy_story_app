@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "574393836007",
+    "project_id": "roudy-story",
+    "storage_bucket": "roudy-story.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:574393836007:android:1fa4eb264dc68a0b9d5d42",
+        "android_client_info": {
+          "package_name": "com.example.roudy_story_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBt9hcoYn7EogrT70ttw1OKzy_fvLonQLk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
