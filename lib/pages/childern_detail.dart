@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dashboard_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart'; // Import screen_util
-
-void main() {
-  runApp(MaterialApp(home: ChildDetailsPage()));
-}
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 
 class ChildDetailsPage extends StatefulWidget {
   @override
@@ -20,23 +17,6 @@ class _ChildDetailsPageState extends State<ChildDetailsPage> {
   String selectedGender = '';
   TextEditingController childNameController = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    retrieveChildName();
-  }
-
-  Future<void> retrieveChildName() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? childName = prefs.getString('child_name');
-
-    if (childName != null) {
-      setState(() {
-        childNameController.text = childName;
-      });
-    }
-  }
-
   void _handleImageUpload() async {
     final picker = ImagePicker();
     final pickedImage = await picker.getImage(source: ImageSource.gallery);
@@ -44,14 +24,41 @@ class _ChildDetailsPageState extends State<ChildDetailsPage> {
     if (pickedImage != null) {
       setState(() {
         _pickedImage = File(pickedImage.path);
-        saveImageToPreferences(_pickedImage!.path); // Save the image path
       });
     }
   }
 
-  Future<void> saveImageToPreferences(String imagePath) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('child_image', imagePath);
+  void _saveChildDetails() async {
+    final String childName = childNameController.text.trim();
+    final String childAge = selectedAge;
+    final String childGender = selectedGender;
+
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+
+      if (user != null) {
+        // Reference Firestore collection for users
+        CollectionReference users =
+            FirebaseFirestore.instance.collection('users');
+
+        // Add a new document with a generated ID
+        await users.doc(user.uid).set({
+          'childName': childName,
+          'childAge': childAge,
+          'childGender': childGender,
+        });
+
+        // Navigate to the dashboard or any other screen after saving
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DashboardPage(),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error saving child details: $e');
+    }
   }
 
   @override
@@ -200,19 +207,7 @@ class _ChildDetailsPageState extends State<ChildDetailsPage> {
                   ),
                   SizedBox(height: 20.h),
                   ElevatedButton(
-                    onPressed: () async {
-                      String childName = childNameController.text;
-                      SharedPreferences prefs =
-                          await SharedPreferences.getInstance();
-                      prefs.setString('child_name', childName);
-                      print('Child Name saved: $childName'); // Add this line
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DashboardPage(),
-                        ),
-                      );
-                    },
+                    onPressed: _saveChildDetails,
                     style: ElevatedButton.styleFrom(
                       primary: Colors.purple,
                       shape: RoundedRectangleBorder(

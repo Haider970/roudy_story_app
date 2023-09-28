@@ -1,11 +1,8 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:roudy_story_app/pages/childern_detail.dart';
 import 'package:roudy_story_app/pages/parents_mode.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChildProfile {
   final String name;
@@ -24,55 +21,58 @@ class DeleteProfilePage extends StatefulWidget {
 
 class _DeleteProfilePageState extends State<DeleteProfilePage> {
   List<ChildProfile> childProfiles = [];
+  ChildProfile? selectedChild; // Store the selected child
 
   @override
   void initState() {
     super.initState();
-    retrieveChildData();
+    // Fetch child profiles from Firebase Firestore
+    fetchChildProfiles();
   }
 
-  Future<void> retrieveChildData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    // Load child data from SharedPreferences
-    final savedChildProfiles = prefs.getStringList('child_profiles');
+  Future<void> fetchChildProfiles() async {
+    try {
+      final QuerySnapshot<Map<String, dynamic>> querySnapshot =
+          await FirebaseFirestore.instance.collection('child_profiles').get();
 
-    if (savedChildProfiles != null) {
-      childProfiles = savedChildProfiles.map((profileString) {
-        final Map<String, dynamic> profileData = json.decode(profileString);
+      final List<ChildProfile> profiles = querySnapshot.docs.map((doc) {
+        final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         return ChildProfile(
-          name: profileData['name'],
-          imagePath: profileData['imagePath'],
+          name: data['name'] ?? '',
+          imagePath: data['imagePath'] ?? '',
         );
       }).toList();
-      setState(() {});
-    } else {
-      // If no saved profiles, add a default profile
-      addUserProfile('Default Child', 'assets/images/default_avatar.png');
-    }
-  }
 
-  Future<void> saveChildProfiles() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    final profilesToSave = childProfiles.map((profile) {
-      return json.encode({
-        'name': profile.name,
-        'imagePath': profile.imagePath,
+      setState(() {
+        childProfiles = profiles;
+        // Select the first child as the default
+        if (childProfiles.isNotEmpty) {
+          selectedChild = childProfiles[0];
+        }
       });
-    }).toList();
-    await prefs.setStringList('child_profiles', profilesToSave);
+    } catch (e) {
+      print('Error fetching child profiles: $e');
+    }
   }
 
   void addUserProfile(String name, String imagePath) {
     final newProfile = ChildProfile(name: name, imagePath: imagePath);
     childProfiles.add(newProfile);
-    saveChildProfiles(); // Save the updated list of profiles
-    setState(() {});
+    setState(() {
+      selectedChild = newProfile; // Select the newly added child
+    });
   }
 
   void deleteChildProfile(int index) {
     childProfiles.removeAt(index);
-    saveChildProfiles(); // Save the updated list of profiles after deletion
-    setState(() {});
+    setState(() {
+      // Select the first child if available
+      if (childProfiles.isNotEmpty) {
+        selectedChild = childProfiles[0];
+      } else {
+        selectedChild = null; // No children left, clear selection
+      }
+    });
   }
 
   @override
@@ -100,9 +100,7 @@ class _DeleteProfilePageState extends State<DeleteProfilePage> {
             Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                for (var index = 0; index < childProfiles.length; index++)
-                  buildProfileButton(childProfiles[index].name,
-                      childProfiles[index].imagePath, index),
+                if (selectedChild != null) buildProfileCard(selectedChild!),
                 ElevatedButton(
                   onPressed: () {
                     // Implement the functionality to add a new profile here
@@ -166,38 +164,47 @@ class _DeleteProfilePageState extends State<DeleteProfilePage> {
     );
   }
 
-  Widget buildProfileButton(String label, String imagePath, int index) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 50.w,
-          backgroundColor: Colors.transparent,
-          backgroundImage: FileImage(File(imagePath)),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+  Widget buildProfileCard(ChildProfile profile) {
+    return Card(
+      margin: EdgeInsets.all(16.0),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
           children: [
-            IconButton(
-              icon: Icon(
-                Icons.delete,
-                color: Colors.red,
+            CircleAvatar(
+              radius: 50.w,
+              backgroundColor: Colors.transparent,
+              backgroundImage: AssetImage(profile.imagePath),
+            ),
+            SizedBox(height: 10.h),
+            Text(
+              profile.name,
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.bold,
               ),
+            ),
+            ElevatedButton(
               onPressed: () {
                 // Implement the functionality to delete a profile here
-                deleteChildProfile(index);
+                deleteChildProfile(childProfiles.indexOf(profile));
               },
+              style: ElevatedButton.styleFrom(
+                primary: Colors.red, // Button background color
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20.0),
+                ),
+              ),
+              child: Text(
+                'Delete',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
-        SizedBox(height: 10.h),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
